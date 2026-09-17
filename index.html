@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ស៊េរីសៀវភៅ GIS និងការយកព័ត៌មានពីចម្ងាយ · យាំ សារដ្ឋ</title>
+<meta name="description" content="សៀវភៅសិក្សាភាសាខ្មែរ ៤ ក្បាល៖ ផែនទីវិទ្យា GIS ការយកព័ត៌មានពីចម្ងាយ និង GIS អនុវត្ត ជាមួយទិន្នន័យពិតរបស់កម្ពុជា។">
+<meta property="og:title" content="ស៊េរីសៀវភៅ GIS និងការយកព័ត៌មានពីចម្ងាយ">
+<meta property="og:description" content="សៀវភៅសិក្សាភាសាខ្មែរ ៤ ក្បាល ឥតគិតថ្លៃ · CC BY-SA 4.0">
+<meta property="og:image" content="https://khgeo.github.io/img/book1.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Moul&family=Siemreap&display=swap" rel="stylesheet">
+<style>
+:root { --ink:#1c2230; --muted:#5f6878; --line:#e3e6ec; --bg:#f7f8fa; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:'Siemreap','Battambang',system-ui,sans-serif; color:var(--ink); background:var(--bg); line-height:1.8; }
+header { background:linear-gradient(135deg,#0d1033 0%,#1a237e 45%,#00493f 100%); color:#fff; padding:64px 20px 80px; }
+.wrap { max-width:1080px; margin:0 auto; padding:0 20px; }
+.kicker { font-family:'Battambang'; letter-spacing:.04em; color:#ffd54f; font-size:15px; }
+h1 { font-family:'Moul'; font-weight:400; font-size:clamp(28px,4.4vw,46px); line-height:1.6; margin:10px 0 6px; }
+.en { font-family:Georgia,serif; font-style:italic; opacity:.85; font-size:19px; }
+.lead { max-width:760px; margin-top:18px; color:#e8eaf6; font-size:17px; }
+.author { margin-top:26px; font-family:'Battambang'; font-size:16px; }
+.author b { font-size:20px; } .author span { opacity:.8; }
+main { margin-top:-48px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:22px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 6px 18px rgba(20,30,60,.08); transition:transform .15s, box-shadow .15s; }
+.card:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(20,30,60,.14); }
+.cover { aspect-ratio:210/297; background:#dfe3ea center/cover no-repeat; position:relative; }
+.cover.soon { display:flex; align-items:center; justify-content:center; flex-direction:column; color:#fff; text-align:center; padding:20px; }
+.cover.soon .t { font-family:'Moul'; font-size:18px; line-height:1.6; }
+.cover.soon .s { font-family:'Battambang'; margin-top:10px; background:rgba(255,255,255,.18); padding:2px 12px; border-radius:20px; font-size:13px; }
+.body { padding:16px 18px 18px; display:flex; flex-direction:column; gap:6px; flex:1; }
+.no { font-family:'Battambang'; font-weight:700; color:#3949ab; font-size:13px; }
+.title { font-family:'Battambang'; font-weight:700; font-size:18px; line-height:1.6; }
+.meta { color:var(--muted); font-size:13.5px; }
+.links { margin-top:auto; display:flex; gap:8px; flex-wrap:wrap; padding-top:8px; }
+.btn { font-family:'Battambang'; font-size:13.5px; text-decoration:none; padding:5px 12px; border-radius:6px; border:1px solid #c5cae9; color:#283593; }
+.btn.primary { background:#283593; color:#fff; border-color:#283593; }
+.btn.disabled { color:#9aa1ad; border-color:var(--line); pointer-events:none; }
+section { margin:56px 0; }
+h2 { font-family:'Battambang'; font-size:24px; margin:0 0 14px; }
+.path { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+.step { background:#fff; border:1px solid var(--line); border-left:4px solid #3949ab; border-radius:8px; padding:12px 14px; font-size:14.5px; }
+.step b { font-family:'Battambang'; display:block; }
+.feat { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
+.feat div { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; font-size:14.5px; }
+.feat b { font-family:'Battambang'; display:block; margin-bottom:4px; }
+footer { border-top:1px solid var(--line); padding:26px 0 40px; color:var(--muted); font-size:13.5px; }
+footer a { color:#283593; }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="kicker">សៀវភៅសិក្សាភាសាខ្មែរ · ថ្នាក់បរិញ្ញាបត្រ ឆ្នាំទី២ និងទី៣</div>
+  <h1>ស៊េរីសៀវភៅ GIS និង<br>ការយកព័ត៌មានពីចម្ងាយ</h1>
+  <div class="en">A Khmer-language textbook series in Cartography, GIS and Remote Sensing</div>
+  <p class="lead">សៀវភៅ ៤ ក្បាល សម្រាប់ ៤ ឆមាស។ សៀវភៅនីមួយៗមាន ១៥ មេរៀនទ្រឹស្ដី ១៥ លំហាត់អនុវត្ត ពិសោធន៍អន្តរកម្ម និងទិន្នន័យពិតរបស់កម្ពុជា។ អានអនឡាញ ឬទាញយក PDF ដោយឥតគិតថ្លៃ។</p>
+  <div class="author"><b>យាំ សារដ្ឋ</b> <span>YAM Sarath</span><br><span>ដេប៉ាតឺម៉ង់ភូមិវិទ្យា និងរៀបចំដែនដី</span></div>
+</div></header>
+
+<main class="wrap">
+  <div class="grid">
+    <article class="card">
+      <a class="cover" href="https://khgeo.github.io/cartography/" style="background-image:url(img/book1.jpg)" aria-label="ផែនទីវិទ្យា"></a>
+      <div class="body"><div class="no">សៀវភៅទី១ · ឆ្នាំទី២ ឆមាសទី១</div><div class="title">ផែនទីវិទ្យា</div>
+        <div class="meta">ផែនដី កូអរដោនេ ចំណោល មាត្រដ្ឋាន និមិត្តសញ្ញា ពណ៌ ផែនទីប្រធានបទ និងប្លង់ផែនទី</div>
+        <div class="links"><a class="btn primary" href="https://khgeo.github.io/cartography/">អានអនឡាញ</a><a class="btn" href="https://github.com/khgeo/cartography">GitHub</a></div></div>
+    </article>
+    <article class="card">
+      <a class="cover" href="https://khgeo.github.io/gis-fundamentals/" style="background-image:url(img/book2.jpg)" aria-label="មូលដ្ឋានគ្រឹះនៃ GIS"></a>
+      <div class="body"><div class="no">សៀវភៅទី២ · ឆ្នាំទី២ ឆមាសទី២</div><div class="title">មូលដ្ឋានគ្រឹះនៃប្រព័ន្ធព័ត៌មានភូមិសាស្ត្រ</div>
+        <div class="meta">គំរូទិន្នន័យ មូលទិន្នន័យ គុណភាព សំណួរលំហ បាហ្វ័រ ការត្រួតស្រទាប់ រ៉ាស្ទ័រ និង MCDA</div>
+        <div class="links"><a class="btn primary" href="https://khgeo.github.io/gis-fundamentals/">អានអនឡាញ</a><a class="btn" href="https://github.com/khgeo/gis-fundamentals/releases/latest">PDF និងទិន្នន័យ</a></div></div>
+    </article>
+    <article class="card">
+      <div class="cover soon" style="background:linear-gradient(160deg,#3e2723,#6d4c41)"><div class="t">មូលដ្ឋានគ្រឹះនៃ<br>ការយកព័ត៌មានពីចម្ងាយ</div><div class="s">កំពុងរៀបចំ</div></div>
+      <div class="body"><div class="no">សៀវភៅទី៣ · ឆ្នាំទី៣ ឆមាសទី១</div><div class="title">មូលដ្ឋានគ្រឹះនៃការយកព័ត៌មានពីចម្ងាយ</div>
+        <div class="meta">រលកអេឡិចត្រូម៉ាញេទិច ឧបករណ៍ចាប់សញ្ញា គុណភាពបង្ហាញ ការកែតម្រូវ និងការចាត់ថ្នាក់រូបភាព</div>
+        <div class="links"><span class="btn disabled">នឹងមកដល់ឆាប់ៗ</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover soon" style="background:linear-gradient(160deg,#1b5e20,#558b2f)"><div class="t">GIS និង<br>ការយកព័ត៌មានពីចម្ងាយ<br>អនុវត្តន៍</div><div class="s">កំពុងរៀបចំ</div></div>
+      <div class="body"><div class="no">សៀវភៅទី៤ · ឆ្នាំទី៣ ឆមាសទី២</div><div class="title">GIS និងការយកព័ត៌មានពីចម្ងាយអនុវត្តន៍</div>
+        <div class="meta">Google Earth Engine កសិកម្ម ទឹកជំនន់ ព្រៃឈើ និងការធ្វើផែនទីពីរូបភាពផ្កាយរណប</div>
+        <div class="links"><span class="btn disabled">នឹងមកដល់ឆាប់ៗ</span></div></div>
+    </article>
+  </div>
+
+  <section>
+    <h2>លំដាប់សិក្សា</h2>
+    <div class="path">
+      <div class="step"><b>១ · ផែនទីវិទ្យា</b>ធ្វើផែនទីឲ្យត្រឹមត្រូវ និងច្បាស់</div>
+      <div class="step"><b>២ · GIS</b>រៀបចំ និងវិភាគទិន្នន័យលំហ</div>
+      <div class="step"><b>៣ · ការយកព័ត៌មានពីចម្ងាយ</b>បង្កើតទិន្នន័យពីរូបភាពផ្កាយរណប</div>
+      <div class="step"><b>៤ · GIS និង RS អនុវត្តន៍</b>ដោះស្រាយបញ្ហាពិតរបស់កម្ពុជា</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>អ្វីដែលមានក្នុងសៀវភៅនីមួយៗ</h2>
+    <div class="feat">
+      <div><b>១៥ មេរៀន × ៣ ម៉ោង</b>ស្ថានភាពជាក់ស្ដែង ទ្រឹស្ដី ឧទាហរណ៍ដែលបានដោះស្រាយ និងសំណួររំលឹក</div>
+      <div><b>១៥ លំហាត់អនុវត្ត</b>ជំហាន QGIS ជាមួយប្រអប់ពិនិត្យលទ្ធផលដោយខ្លួនឯង</div>
+      <div><b>ពិសោធន៍អន្តរកម្ម</b>ផែនទី ល្បែង និងការក្លែងធ្វើ ដែលធ្វើឲ្យគោលគំនិតងាយយល់</div>
+      <div><b>ទិន្នន័យពិតរបស់កម្ពុជា</b>សំណុំទិន្នន័យ ៤៣ ស្រទាប់ ដែលប្រើរួមគ្នាគ្រប់សៀវភៅ</div>
+      <div><b>វាក្យសព្ទរួម</b>ពាក្យបច្ចេកទេសខ្មែរ–អង់គ្លេសតែមួយសម្រាប់ស៊េរីទាំងមូល</div>
+      <div><b>ឥតគិតថ្លៃ និងបើកចំហ</b>CC BY-SA 4.0 · អាចបោះពុម្ព ចែករំលែក និងកែសម្រួល</div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  © ២០២៦ យាំ សារដ្ឋ (YAM Sarath) · ខ្លឹមសារចេញផ្សាយក្រោម <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.km">CC BY-SA 4.0</a> ·
+  <a href="https://github.com/khgeo">github.com/khgeo</a>
+</div></footer>
+</body>
+</html>
