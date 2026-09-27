@@ -7,8 +7,8 @@ Share this single link: **https://khgeo.github.io/**
 |---|---|---|
 | 1 · Cartography | https://khgeo.github.io/cartography/ | khgeo/cartography |
 | 2 · Fundamentals of GIS | https://khgeo.github.io/gis-fundamentals/ | khgeo/gis-fundamentals |
-| 3 · Fundamentals of Remote Sensing | planned | |
-| 4 · Applied GIS and Remote Sensing | planned | |
+| 3 · Fundamentals of Remote Sensing | https://khgeo.github.io/remote-sensing/ | khgeo/remote-sensing |
+| 4 · Applied GIS and Remote Sensing | https://khgeo.github.io/applied-gis-rs/ | khgeo/applied-gis-rs |
 
 Plain static HTML: no build step. GitHub Pages serves `index.html` from the `main` branch root.
-When a new book is published, replace its "coming soon" card in `index.html` and add a cover image to `img/`.
+PDFs are attached to each book repository's GitHub Releases; the PDF buttons link to `releases/latest`.
