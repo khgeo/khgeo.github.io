@@ -1,1 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Answer sheet scanner</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--teal:#0F6E6E;--ink:#14213D;--muted:#6B7A80;--line:#E2E7E5;--ok:#2E7D4F;--bad:#B3412F;--amber:#E0A526}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0d1520;color:#fff;font-family:system-ui,-apple-system,"Segoe UI","Kantumruy Pro",sans-serif;min-height:100vh}
+  .card{background:#fff;color:var(--ink);border-radius:14px;padding:24px;max-width:380px;margin:12vh auto 0;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  h1{font-size:19px;margin:0 0 4px} .sub{color:var(--muted);font-size:13px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 4px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:16px}
+  button{border:0;border-radius:9px;padding:11px 16px;font-size:15px;font-weight:600;cursor:pointer}
+  .primary{background:var(--teal);color:#fff;width:100%;margin-top:16px}
+  .err{color:var(--bad);font-size:13px;margin-top:10px;min-height:1em}
+  #scan{display:none;flex-direction:column;height:100vh;height:100dvh}
+  .top{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:#14213D}
+  .top b{flex:1;font-size:15px} .top small{color:#aab}
+  .top button{background:#26344f;color:#fff;padding:7px 11px;font-size:13px}
+  .stage{position:relative;flex:1;background:#000;overflow:hidden}
+  video,#ov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .status{position:absolute;left:12px;right:12px;bottom:12px;padding:12px 14px;border-radius:12px;background:rgba(20,33,61,.86);font-size:15px;line-height:1.35}
+  .status.ok{background:rgba(46,125,79,.95)} .status.warn{background:rgba(179,65,47,.95)} .status.info{background:rgba(15,110,110,.92)}
+  .status .big{font-size:22px;font-weight:700}
+  .status button{background:#fff;color:var(--ink);padding:7px 12px;margin-top:8px;font-size:14px}
+  .bottom{display:flex;gap:8px;align-items:center;padding:10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:#14213D;font-size:13px}
+  .bottom .grow{flex:1;color:#cdd}
+  .bottom label{margin:0;background:#26344f;padding:8px 12px;border-radius:9px;font-weight:600;font-size:13px}
+  #log{max-height:22vh;overflow:auto;background:#101a2b;font-size:13px}
+  #log div{padding:6px 14px;border-top:1px solid #1f2b40} #log .s{float:right;font-weight:700}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+<div id="login" class="card">
+  <h1>📷 Answer sheet scanner</h1>
+  <div class="sub">Department of Geography and Land Management, RUPP. Sign in with your grading-system username and password.</div>
+  <label for="u">Username</label><input id="u" autocomplete="username" autocapitalize="none">
+  <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+  <button class="primary" id="go">Sign in</button>
+  <div class="err" id="lerr"></div>
+</div>
+<div id="scan">
+  <div class="top"><b id="who">Scanner</b><small id="tally"></small><button id="out">Sign out</button></div>
+  <div class="stage"><video id="v" playsinline muted></video><canvas id="ov"></canvas>
+    <div class="status" id="st">Starting the camera…</div></div>
+  <div id="log"></div>
+  <div class="bottom"><span class="grow">Hold the phone above the sheet so all four black squares are visible.</span>
+    <label>Take a photo instead<input id="snap" type="file" accept="image/*" capture="environment" hidden></label></div>
+</div>
+<script>
+/* The grading system's web app address (the same /exec link as in grading/index.html). */
+var APP = "https://script.google.com/macros/s/AKfycbwAWO4UOoiQpeto5OWjgSO8o9OYHh9vuDdBzfcWM6GwdnVaZXn_KmRcosSgz1ZG0u8G0g/exec";
+/* Answer-sheet reader (pure JavaScript, no libraries except jsQR for the QR code).
+ * Sheet geometry in millimetres on A4 portrait; the printed sheet in the grading system uses the same numbers. */
+var SHEET = {
+  w: 210, h: 297, marker: 8,
+  markers: [[15, 60], [195, 60], [15, 282], [195, 282]],   // top-left, top-right, bottom-left, bottom-right (centres)
+  qr: { x: 165, y: 14, size: 30 },
+  left: 25, top: 72, colW: 40, rowH: 8, rows: 25, numW: 9, gap: 6, r: 2.1
+};
+function bubbleXY(k, j) {
+  var col = Math.floor(k / SHEET.rows), row = k % SHEET.rows;
+  return [SHEET.left + col * SHEET.colW + SHEET.numW + j * SHEET.gap + SHEET.r, SHEET.top + row * SHEET.rowH + SHEET.rowH / 2];
+}
 
+function toGray(rgba, w, h) {
+  var g = new Uint8Array(w * h);
+  for (var i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
+  return g;
+}
+
+function otsu(gray) {
+  var hist = new Array(256).fill(0), n = gray.length, sum = 0, i;
+  for (i = 0; i < n; i++) hist[gray[i]]++;
+  for (i = 0; i < 256; i++) sum += i * hist[i];
+  var sumB = 0, wB = 0, best = 0, t = 128;
+  for (i = 0; i < 256; i++) {
+    wB += hist[i]; if (!wB) continue;
+    var wF = n - wB; if (!wF) break;
+    sumB += i * hist[i];
+    var mB = sumB / wB, mF = (sum - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+    if (v > best) { best = v; t = i; }
+  }
+  return t;
+}
+
+/** Dark connected regions: [{ x, y (centre), minx, maxx, miny, maxy, area }]. */
+function blobs(gray, w, h, thr, maxArea) {
+  var lab = new Int32Array(w * h), stack = new Int32Array(w * h), out = [], id = 0;
+  for (var start = 0; start < w * h; start++) {
+    if (lab[start] || gray[start] >= thr) continue;
+    id++;
+    var sp = 0, area = 0, sx = 0, sy = 0, minx = w, maxx = 0, miny = h, maxy = 0, big = false;
+    stack[sp++] = start; lab[start] = id;
+    while (sp) {
+      var p = stack[--sp], x = p % w, y = (p - x) / w;
+      area++; sx += x; sy += y;
+      if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
+      if (area > maxArea) big = true;
+      if (x > 0 && !lab[p - 1] && gray[p - 1] < thr) { lab[p - 1] = id; stack[sp++] = p - 1; }
+      if (x < w - 1 && !lab[p + 1] && gray[p + 1] < thr) { lab[p + 1] = id; stack[sp++] = p + 1; }
+      if (y > 0 && !lab[p - w] && gray[p - w] < thr) { lab[p - w] = id; stack[sp++] = p - w; }
+      if (y < h - 1 && !lab[p + w] && gray[p + w] < thr) { lab[p + w] = id; stack[sp++] = p + w; }
+    }
+    if (!big) out.push({ x: sx / area, y: sy / area, minx: minx, maxx: maxx, miny: miny, maxy: maxy, area: area });
+  }
+  return out;
+}
+
+/** The four corner marks, using the QR code (jsQR location) to know the scale and to ignore its own squares. */
+function findMarkers(gray, w, h, qrLoc) {
+  var c = qrLoc, d = function (a, b) { return Math.hypot(a.x - b.x, a.y - b.y); };
+  var side = (d(c.topLeftCorner, c.topRightCorner) + d(c.topLeftCorner, c.bottomLeftCorner) + d(c.topRightCorner, c.bottomRightCorner) + d(c.bottomLeftCorner, c.bottomRightCorner)) / 4;
+  var ppm = side / SHEET.qr.size, exp = SHEET.marker * ppm;
+  var qx = [c.topLeftCorner.x, c.topRightCorner.x, c.bottomLeftCorner.x, c.bottomRightCorner.x];
+  var qy = [c.topLeftCorner.y, c.topRightCorner.y, c.bottomLeftCorner.y, c.bottomRightCorner.y];
+  var pad = side * 0.15, qminx = Math.min.apply(0, qx) - pad, qmaxx = Math.max.apply(0, qx) + pad, qminy = Math.min.apply(0, qy) - pad, qmaxy = Math.max.apply(0, qy) + pad;
+  var thr = Math.min(otsu(gray), 140);
+  var cand = blobs(gray, w, h, thr, exp * exp * 4).filter(function (b) {
+    var bw = b.maxx - b.minx + 1, bh = b.maxy - b.miny + 1;
+    if (bw < exp * 0.5 || bw > exp * 1.7 || bh < exp * 0.5 || bh > exp * 1.7) return false;
+    if (b.area / (bw * bh) < 0.65) return false;
+    return !(b.x > qminx && b.x < qmaxx && b.y > qminy && b.y < qmaxy);
+  });
+  if (cand.length < 4) return null;
+  var pick = function (f) { return cand.reduce(function (a, b) { return f(b) > f(a) ? b : a; }); };
+  var tl = pick(function (b) { return -(b.x + b.y); }), br = pick(function (b) { return b.x + b.y; });
+  var tr = pick(function (b) { return b.x - b.y; }), bl = pick(function (b) { return b.y - b.x; });
+  if (new Set([tl, tr, bl, br]).size < 4) return null;
+  // sanity: marks are 180 mm apart across and 222 mm down
+  var across = (d(tl, tr) + d(bl, br)) / 2, down = (d(tl, bl) + d(tr, br)) / 2, ratio = down / across;
+  if (ratio < 222 / 180 * 0.75 || ratio > 222 / 180 * 1.33) return null;
+  return { pts: [tl, tr, bl, br], ppm: ppm };
+}
+
+/** 3×3 perspective transform taking 4 source points to 4 destination points. */
+function homography(src, dst) {
+  var A = [], b = [];
+  for (var i = 0; i < 4; i++) {
+    var x = src[i][0], y = src[i][1], u = dst[i][0], v = dst[i][1];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  for (var c = 0; c < 8; c++) {
+    var m = c; for (var r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[m][c])) m = r;
+    var t = A[c]; A[c] = A[m]; A[m] = t; t = b[c]; b[c] = b[m]; b[m] = t;
+    for (r = c + 1; r < 8; r++) {
+      var f = A[r][c] / A[c][c];
+      for (var k = c; k < 8; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  var hh = new Array(8);
+  for (c = 7; c >= 0; c--) { var s = b[c]; for (k = c + 1; k < 8; k++) s -= A[c][k] * hh[k]; hh[c] = s / A[c][c]; }
+  return [hh[0], hh[1], hh[2], hh[3], hh[4], hh[5], hh[6], hh[7], 1];
+}
+function project(H, x, y) {
+  var z = H[6] * x + H[7] * y + H[8];
+  return [(H[0] * x + H[1] * y + H[2]) / z, (H[3] * x + H[4] * y + H[5]) / z];
+}
+
+function diskMean(gray, w, h, cx, cy, r) {
+  var s = 0, n = 0, r2 = r * r;
+  for (var y = Math.max(0, Math.floor(cy - r)); y <= Math.min(h - 1, Math.ceil(cy + r)); y++)
+    for (var x = Math.max(0, Math.floor(cx - r)); x <= Math.min(w - 1, Math.ceil(cx + r)); x++)
+      if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r2) { s += gray[y * w + x]; n++; }
+  return n ? s / n : 255;
+}
+
+/**
+ * Read the bubbles of one sheet. layout: [{ n: number of bubbles, multi: true for several answers }].
+ * Returns { marks: [[filled positions]...], doubtful: [question numbers] }.
+ */
+function readBubbles(gray, w, h, H, layout) {
+  var ppx = function (x, y) { var a = project(H, x, y), b = project(H, x + 1, y); return Math.hypot(b[0] - a[0], b[1] - a[1]); };
+  var vals = layout.map(function (q, k) {
+    var out = [];
+    for (var j = 0; j < q.n; j++) {
+      var mm = bubbleXY(k, j), p = project(H, mm[0], mm[1]);
+      out.push(diskMean(gray, w, h, p[0], p[1], Math.max(1.5, 1.15 * ppx(mm[0], mm[1]))));
+    }
+    return out;
+  });
+  var black = SHEET.markers.reduce(function (t, m) { var p = project(H, m[0], m[1]); return t + diskMean(gray, w, h, p[0], p[1], 2.5 * ppx(m[0], m[1])); }, 0) / 4;
+  var all = [].concat.apply([], vals).sort(function (a, b) { return a - b; });
+  var white = all[Math.floor(all.length * 0.75)] || 230;
+  var span = Math.max(30, white - black), thr = white - 0.42 * span;
+  var doubtful = [];
+  var marks = vals.map(function (v, k) {
+    var f = [];
+    v.forEach(function (g, j) { if (g < thr) f.push(j); });
+    if (!layout[k].multi && f.length > 1) {
+      var s = f.slice().sort(function (a, b) { return v[a] - v[b]; });
+      if (v[s[1]] - v[s[0]] > 0.22 * span) f = [s[0]]; else doubtful.push(k + 1);
+    }
+    return f;
+  });
+  return { marks: marks, doubtful: doubtful, white: white, black: black };
+}
+
+/** One camera frame: rgba pixels → { code } (no sheet), or { code, marks, corners, doubtful }. layoutFor(code) gives the layout or null. */
+function scanFrame(rgba, w, h, jsQRfn, layoutFor) {
+  var qr = jsQRfn(rgba, w, h, { inversionAttempts: 'dontInvert' });
+  if (!qr || !/^GS:[A-Z0-9]{8}$/.test(qr.data)) return null;
+  var code = qr.data.slice(3);
+  var layout = layoutFor(code);
+  if (!layout) return { code: code };
+  var gray = toGray(rgba, w, h);
+  var mk = findMarkers(gray, w, h, qr.location);
+  if (!mk) return { code: code, nomarks: true };
+  var H = homography(SHEET.markers, mk.pts.map(function (p) { return [p.x, p.y]; }));
+  var r = readBubbles(gray, w, h, H, layout);
+  return { code: code, marks: r.marks, doubtful: r.doubtful, corners: mk.pts, H: H };
+}
+
+/* ---------- scanner app ---------- */
+var tok = '', cache = {}, pending = {}, last = null, same = 0, saved = {}, busy = false, confirmCode = null;
+function $(id) { return document.getElementById(id); }
+function post(action, payload) {
+  payload = payload || {}; if (tok) payload._t = tok;
+  return fetch(APP, { method: 'POST', body: JSON.stringify({ action: action, payload: payload }) })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (!j.ok) throw new Error(j.error || 'Failed'); return j.data; });
+}
+function status(html, kind) { var s = $('st'); s.className = 'status ' + (kind || ''); s.innerHTML = html; }
+function esc(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function beep(ok) {
+  try { var a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = ok ? 880 : 300; o.connect(g); g.connect(a.destination); g.gain.value = .15; o.start(); o.stop(a.currentTime + (ok ? .15 : .35)); } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate(ok ? 80 : [60, 60, 60]);
+}
+function signedIn(name) {
+  $('login').style.display = 'none'; $('scan').style.display = 'flex'; $('who').textContent = name || 'Scanner';
+  startCamera();
+}
+$('go').onclick = function () {
+  $('lerr').textContent = ''; $('go').disabled = true;
+  post('login', { username: $('u').value.trim(), password: $('p').value, remember: true }).then(function (d) {
+    tok = d.token; localStorage.setItem('gs_scan_tok', tok); localStorage.setItem('gs_scan_name', (d.ctx && d.ctx.name) || $('u').value);
+    signedIn(localStorage.getItem('gs_scan_name'));
+  }).catch(function (e) { $('lerr').textContent = e.message; }).then(function () { $('go').disabled = false; });
+};
+$('out').onclick = function () { localStorage.removeItem('gs_scan_tok'); location.reload(); };
+var cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true }), ov = $('ov'), ox = ov.getContext('2d');
+function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status('This browser cannot use the live camera. Use "Take a photo instead".', 'warn'); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+    var v = $('v'); v.srcObject = st; v.play(); status('Point the camera at an answer sheet.', 'info'); loop();
+  }).catch(function (e) { status('Camera not available (' + esc(e.message) + '). Allow the camera, or use "Take a photo instead".', 'warn'); });
+}
+function layoutFor(code) {
+  if (cache[code]) return cache[code].layout;
+  if (!pending[code]) {
+    pending[code] = 1;
+    post('scanLookup', { code: code }).then(function (d) { cache[code] = d; }).catch(function (e) { cache[code] = { error: e.message, layout: null }; status(esc(e.message), 'warn'); beep(false); });
+  }
+  return null;
+}
+function frame(src, w, h) {
+  var scale = Math.min(1, 1000 / Math.max(w, h)); cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+  cx.drawImage(src, 0, 0, cv.width, cv.height);
+  var img = cx.getImageData(0, 0, cv.width, cv.height);
+  return { r: scanFrame(img.data, cv.width, cv.height, jsQR, layoutFor), w: cv.width, h: cv.height };
+}
+function drawOverlay(res, fw, fh) {
+  var v = $('v'); ov.width = ov.clientWidth; ov.height = ov.clientHeight; ox.clearRect(0, 0, ov.width, ov.height);
+  if (!res || !res.r || !res.r.corners) return;
+  // video uses object-fit:cover: map frame coordinates to the screen
+  var s = Math.max(ov.width / fw, ov.height / fh), dx = (ov.width - fw * s) / 2, dy = (ov.height - fh * s) / 2;
+  var P = function (x, y) { return [x * s + dx, y * s + dy]; };
+  var c = res.r.corners; ox.strokeStyle = '#4ade80'; ox.lineWidth = 3; ox.beginPath();
+  [c[0], c[1], c[3], c[2], c[0]].forEach(function (p, i) { var q = P(p.x, p.y); i ? ox.lineTo(q[0], q[1]) : ox.moveTo(q[0], q[1]); }); ox.stroke();
+  ox.fillStyle = 'rgba(74,222,128,.85)';
+  res.r.marks.forEach(function (row, k) { row.forEach(function (j) { var mm = bubbleXY(k, j), p = project(res.r.H, mm[0], mm[1]), q = P(p[0], p[1]); ox.beginPath(); ox.arc(q[0], q[1], 5, 0, 7); ox.fill(); }); });
+}
+function handle(res) {
+  var r = res && res.r;
+  if (!r) { if (!busy && !confirmCode) status('Point the camera at an answer sheet. Move closer if it is far.', 'info'); last = null; return; }
+  var info = cache[r.code];
+  if (!info) { status('Reading sheet ' + esc(r.code) + '…', 'info'); return; }
+  if (info.error) return;
+  var who = esc(info.student.name) + ' · ' + esc(info.student.code) + '<br><small>' + esc(info.cls) + ' · ' + esc(info.title) + '</small>';
+  if (r.nomarks || !r.marks) { status(who + '<br>Show all four black squares in the picture.', 'info'); return; }
+  var key = r.code + JSON.stringify(r.marks);
+  same = last === key ? same + 1 : 0; last = key;
+  if (same < 1 || busy) return;                        // two identical readings in a row
+  if (saved[r.code] === key) return;                   // this exact sheet was just saved
+  var prev = info.scanned || (saved[r.code] && { score: '?', max: '?' });
+  if (prev && confirmCode !== r.code) {
+    confirmCode = r.code;
+    status(who + '<br>Already scanned (' + prev.score + '/' + prev.max + '). <button id="again">Save this reading again</button>', 'warn');
+    $('again').onclick = function () { info.scanned = null; delete saved[r.code]; confirmCode = null; same = 0; };
+    return;
+  }
+  if (prev) return;
+  busy = true;
+  post('scanPaper', { code: r.code, marks: r.marks }).then(function (d) {
+    saved[r.code] = key; info.scanned = { score: d.score, max: d.max };
+    var warn = r.doubtful.length ? '<br><small>⚠ Two answers on question ' + r.doubtful.join(', ') + ': counted as no answer.</small>' : '';
+    status('<span class="big">' + d.score + ' / ' + d.max + '</span> ✓ saved<br>' + esc(d.student.name) + ' · ' + esc(d.student.code) + (d.sync && d.sync.ok === false ? '<br><small>Official form will update later.</small>' : '') + warn, r.doubtful.length ? 'warn' : 'ok');
+    $('tally').textContent = d.done + ' / ' + d.total + ' scanned';
+    var row = document.createElement('div'); row.innerHTML = '<span class="s">' + d.score + '/' + d.max + '</span>' + esc(d.student.code) + ' · ' + esc(d.student.name);
+    $('log').insertBefore(row, $('log').firstChild);
+    beep(true);
+  }).catch(function (e) { status('Not saved: ' + esc(e.message), 'warn'); beep(false); }).then(function () { busy = false; });
+}
+var lastT = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  var v = $('v'); if (!v.videoWidth || t - lastT < 260) return; lastT = t;
+  var res = frame(v, v.videoWidth, v.videoHeight); drawOverlay(res, res.w, res.h); handle(res);
+}
+$('snap').onchange = function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var img = new Image(); img.onload = function () {
+    var tries = 0, go = function () { var res = frame(img, img.naturalWidth, img.naturalHeight); if (res.r && res.r.code && !cache[res.r.code] && tries++ < 20) return setTimeout(go, 300); same = 1; last = res.r && res.r.marks ? res.r.code + JSON.stringify(res.r.marks) : null; handle(res); if (!res.r) status('No answer sheet found in the photo. Take it closer, with all four black squares visible.', 'warn'); };
+    go();
+  };
+  img.src = URL.createObjectURL(f);
+};
+tok = localStorage.getItem('gs_scan_tok') || '';
+if (tok) signedIn(localStorage.getItem('gs_scan_name'));
+</script>
+</body>
+</html>
